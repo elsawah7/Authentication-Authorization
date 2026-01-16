@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerifyAcountMail;
+use Illuminate\Support\Facades\Hash;
+
+class LoginController extends Controller
+{
+    /**
+     * Handle the incoming request.
+     */
+    public function __invoke(LoginRequest $request)
+    {
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return back()->with('error', 'Invalid credentials provided.');
+        }
+
+        if (!Hash::check($request->password, $user->password)) {
+            return back()->with('error', 'Invalid credentials provided.');
+        }
+
+        if (!$user->email_verified_at) {
+            Mail::to($user->email)->send(new VerifyAcountMail($user->otp, $user->email));
+            return redirect()->route('email.verify', ['email' => $user->email])->with('info', 'Please verify your email before logging in. An OTP has been sent to your email address.');
+        }
+        if (Auth::attempt($request->only('email', 'password'))) {
+            return redirect()->intended('profile');
+        }
+        return back()->with('error', 'Invalid credentials provided.');
+    }
+}
